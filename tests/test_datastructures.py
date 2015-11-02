@@ -30,14 +30,6 @@ class Test_SourceTestMap(TestCase):
         }
         self.expected_serialized_data = (self.filename, self.expected_dict)
 
-    def test_init_with_data(self):
-        other_obj = _SourceTestMap(
-            data=('foo.py',
-                  {1: set(['test_foo', 'test_bar']),
-                   5: set(['test_foo_again'])}))
-
-        self.assertEqual(self.obj, other_obj)
-
     def test_eq(self):
         other_obj = _SourceTestMap(filename=self.filename)
 
@@ -51,7 +43,7 @@ class Test_SourceTestMap(TestCase):
         expected = set(['test_foo', 'test_bar'])
         self.assertEqual(self.obj[1], expected)
 
-    def test_empty_implies_is_untested(self):
+    def test_untested_file(self):
         other_obj = _SourceTestMap('bar.py')
         self.assertTrue(other_obj.is_untested)
 
@@ -95,9 +87,6 @@ class TestSourceMap(TestCase):
                 5: [test_bar_index],
             })
         ]
-
-    def test_init_with_data(self):
-        self.fail()
 
     def test_touch(self):
         other_obj = SourceMap()

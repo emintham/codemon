@@ -4,7 +4,7 @@ from collections import defaultdict, OrderedDict
 __all__ = ['SourceMap']
 
 
-class _SourceTestMap(object):
+class _SourceTestMap(defaultdict):
     """_SourceTestMap
 
     defaultdict(set) where:
@@ -12,34 +12,17 @@ class _SourceTestMap(object):
         value:  set of tests affected by the line
     """
 
-    def __init__(self, filename=None, data=None):
-        assert filename or data
-
-        if filename:
-            self.filename = filename
-            self._dict = defaultdict(set)
-        else:
-            self.filename, self._dict = data
-
-    def __getitem__(self, line_number):
-        return self._dict[line_number]
-
-    def __delitem__(self, line_number):
-        del self._dict[line_number]
-
-    def __repr__(self):
-        return repr(self._dict)
-
-    def __iter__(self):
-        return iter(self._dict)
+    def __init__(self, filename=None):
+        super(_SourceTestMap, self).__init__(set)
+        self.filename = filename
 
     def __eq__(self, other):
         return (self.filename == other.filename and
-                self._dict == other._dict)
+                super(_SourceTestMap, self).__eq__(dict(other)))
 
     @property
     def all_affected_tests(self):
-        tests = self._dict.values()
+        tests = self.values()
 
         if tests:
             affected_tests = set.union(*tests)
@@ -53,13 +36,14 @@ class _SourceTestMap(object):
         assert len(serialized_data) == 2
         assert isinstance(serialized_data[1], dict)
 
-        d = {}
+        filename, d = serialized_data
+        new_obj = cls(filename=filename)
 
-        for line_num, test_names in serialized_data[1].items():
-            d[line_num] = set((reverse_lookup[testname]
-                               for testname in test_names))
+        for line_num, test_names in d.items():
+            new_obj[line_num] = set(reverse_lookup[testname]
+                                    for testname in test_names)
 
-        return _SourceTestMap(data=(serialized_data[0], d))
+        return new_obj
 
     @classmethod
     def serialize(cls, instance, testname_dict):
@@ -67,7 +51,7 @@ class _SourceTestMap(object):
 
         d = {}
 
-        for line_num, test_names in instance._dict.items():
+        for line_num, test_names in instance.items():
             test_indices = [testname_dict[testname] for testname in test_names]
             d[line_num] = sorted(test_indices)
 
@@ -75,10 +59,10 @@ class _SourceTestMap(object):
 
     @property
     def is_untested(self):
-        return len(self._dict) == 0
+        return len(self) == 0
 
     def add(self, line_number, test_name):
-        self._dict[line_number].add(test_name)
+        self[line_number].add(test_name)
 
 
 class SourceMap(OrderedDict):
