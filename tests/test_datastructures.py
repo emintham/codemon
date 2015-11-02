@@ -31,7 +31,12 @@ class Test_SourceTestMap(TestCase):
         self.expected_serialized_data = (self.filename, self.expected_dict)
 
     def test_init_with_data(self):
-        self.fail()
+        other_obj = _SourceTestMap(
+            data=('foo.py',
+                  {1: set(['test_foo', 'test_bar']),
+                   5: set(['test_foo_again'])}))
+
+        self.assertEqual(self.obj, other_obj)
 
     def test_eq(self):
         other_obj = _SourceTestMap(filename=self.filename)
@@ -77,6 +82,19 @@ class TestSourceMap(TestCase):
 
         self.obj.touch(self.filenames[0])
         self.obj[self.filenames[1]] = self.coverage_data
+
+        self.expected_reverse_index = self.obj.reverse_index.copy()
+        self.expected_index = self.obj.index.copy()
+        test_bar_index = self.expected_index['test_bar']
+
+        self.expected_serialized_data = [
+            ('foo.py', {}),
+            ('bar.py', {
+                1: [test_bar_index],
+                3: [test_bar_index],
+                5: [test_bar_index],
+            })
+        ]
 
     def test_init_with_data(self):
         self.fail()
@@ -128,3 +146,21 @@ class TestSourceMap(TestCase):
         self.assertEqual(self.obj.suite(), self.tests)
         self.assertEqual(self.obj.suite([self.filenames[0]]), self.tests[:-1])
         self.assertEqual(self.obj.suite([self.filenames[1]]), self.tests[-1:])
+
+    def test_serialize(self):
+        serialized_data = SourceMap.serialize(self.obj)
+
+        self.assertEqual(serialized_data[0],
+                         self.expected_serialized_data)
+        self.assertEqual(serialized_data[1], self.obj.reverse_index)
+
+    def test_deserialize(self):
+        actual = SourceMap.deserialize(self.expected_serialized_data,
+                                       self.obj.reverse_index)
+        self.assertEqual(actual, self.obj)
+
+    def test_serialize_deserialize_are_inverses(self):
+        serialized = SourceMap.serialize(self.obj)
+        actual = SourceMap.deserialize(*serialized)
+
+        self.assertEqual(actual, self.obj)

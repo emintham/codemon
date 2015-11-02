@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 
 __all__ = ['SourceMap']
@@ -12,14 +12,14 @@ class _SourceTestMap(object):
         value:  set of tests affected by the line
     """
 
-    def __init__(self, filename=None, other=None):
-        assert filename or other
+    def __init__(self, filename=None, data=None):
+        assert filename or data
 
         if filename:
             self.filename = filename
             self._dict = defaultdict(set)
         else:
-            self.filename, self._dict = other
+            self.filename, self._dict = data
 
     def __getitem__(self, line_number):
         return self._dict[line_number]
@@ -47,8 +47,8 @@ class _SourceTestMap(object):
         else:
             return []
 
-    @staticmethod
-    def deserialize(serialized_data, reverse_lookup):
+    @classmethod
+    def deserialize(cls, serialized_data, reverse_lookup):
         assert isinstance(serialized_data, tuple)
         assert len(serialized_data) == 2
         assert isinstance(serialized_data[1], dict)
@@ -59,17 +59,19 @@ class _SourceTestMap(object):
             d[line_num] = set((reverse_lookup[testname]
                                for testname in test_names))
 
-        return _SourceTestMap(other=(serialized_data[0], d))
+        return _SourceTestMap(data=(serialized_data[0], d))
 
-    @staticmethod
-    def serialize(obj, testname_dict):
+    @classmethod
+    def serialize(cls, instance, testname_dict):
+        assert isinstance(instance, cls)
+
         d = {}
 
-        for line_num, test_names in obj._dict.items():
+        for line_num, test_names in instance._dict.items():
             test_indices = [testname_dict[testname] for testname in test_names]
             d[line_num] = sorted(test_indices)
 
-        return (obj.filename, d)
+        return (instance.filename, d)
 
     @property
     def is_untested(self):
@@ -79,81 +81,83 @@ class _SourceTestMap(object):
         self._dict[line_number].add(test_name)
 
 
-class SourceMap(object):
+class SourceMap(OrderedDict):
     """SourceMap
 
-    A collection of SourceTestMaps with a convenient interface.
+    An OrderedDict of SourceTestMaps with a convenient interface.
     """
 
-    def __init__(self, other=None):
-        self._source_map = {}
-
-        if other is not None:
-            self._deserialize(other)
-
-    def __getitem__(self, filename):
-        return self._source_map[filename]
-
     def __setitem__(self, filename, coverage_data):
+        if not isinstance(coverage_data, tuple):
+            super(SourceMap, self).__setitem__(filename, coverage_data)
+            return
+
         test_name, line_nums = coverage_data
 
         self.touch(filename)
 
         for num in line_nums:
-            self._source_map[filename].add(num, test_name)
-
-    def __delitem__(self, filename):
-        del self._source_map[filename]
-
-    def __repr__(self):
-        return repr(self._source_map)
-
-    def __iter__(self):
-        return iter(self._source_map)
+            self[filename].add(num, test_name)
 
     @property
     def files(self):
-        return self._source_map.keys()
+        return self.keys()
 
     @property
     def untested_files(self):
         return [filename
-                for filename, source in self._source_map.items()
+                for filename, source in self.items()
                 if source.is_untested]
 
     def suite(self, filenames=None):
         """
         Returns a list of all related tests for a given list of source files.
         """
-        filenames = filenames or self._source_map.keys()
+        filenames = filenames or self.files
 
         return [test
                 for filename in filenames
-                for test in self._source_map[filename].all_affected_tests]
+                for test in self[filename].all_affected_tests]
 
-    def _deserialize(self, other):
-        reverse_testname_lookup, d = other
-
-        for k, v in d.items():
-            self._source_map[k] = _SourceTestMap.deserialize(v)
-
-    def serialize(self):
-        d = {}
-        testname_lookup = {
+    @property
+    def index(self):
+        return {
             testname: index
             for index, testname in enumerate(self.suite())
         }
 
-        for k, v in self._source_map.items():
-            d[k] = v.serialize(testname_lookup)
+    @property
+    def reverse_index(self):
+        return dict(enumerate(self.suite()))
 
-        reverse_testname_lookup = {
-            index: testname
-            for testname, index in testname_lookup.items()
-        }
+    @classmethod
+    def deserialize(cls, data, reverse_index):
+        new_obj = cls()
 
-        return (reverse_testname_lookup, d)
+        for serialized_stm in data:
+            filename, _ = serialized_stm
+
+            new_obj[filename] = _SourceTestMap.deserialize(
+                serialized_stm,
+                reverse_index
+            )
+
+        return new_obj
+
+    @classmethod
+    def serialize(cls, instance):
+        assert isinstance(instance, cls)
+
+        testname_lookup = instance.index.copy()
+
+        serialized_data = []
+        for filename, stm in instance.items():
+            serialized_data.append(
+                _SourceTestMap.serialize(stm, testname_lookup)
+            )
+
+        return (serialized_data, instance.reverse_index)
 
     def touch(self, filename):
-        if filename not in self._source_map:
-            self._source_map[filename] = _SourceTestMap(filename)
+        if filename not in self:
+            self[filename] = _SourceTestMap(filename)
