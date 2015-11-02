@@ -1,0 +1,10 @@
+omit:
+  - '*/migrations/*'
+  - '*/tests/*'
+  - '*tests.py'
+
+source:
+  - '*/codemon/*'
+
+omit_tests:
+  - 'foo*'

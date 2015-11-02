@@ -17,51 +17,30 @@ class Config(object):
     to being empty if not specified.
     """
 
-    def __init__(self, omit=[], source='.', omit_tests=[], config=None):
+    DEFAULT_FILENAME = '.codemonrc'
+
+    def __init__(self, omit=[], source='.', omit_tests=[]):
         self.omit = omit or []
         self.source = source or '.'
         self.omit_tests = omit_tests or []
 
-        if config is not None:
-            assert isinstance(config, dict)
-
-            self.omit = config.get('omit', self.omit)
-            self.source = config.get('source', self.source)
-            self.omit_tests = config.get('omit_tests', self.omit_tests)
-
         # initialize omit_tests regex
-        self.omit_tests = [self.get_regex(s) for s in self.omit_tests]
+        self.omit_tests = [self._regex_replacement(s) for s in self.omit_tests]
 
-    def get_regex(self, pattern):
-        return re.compile(pattern.replace('*', '.*'))
+    def _regex_replacement(self, pattern):
+        return re.compile('^' + pattern.replace('*', '.*'))
 
     def is_omitted_test(self, test_name):
         return any([re.search(pattern, test_name)
                     for pattern in self.omit_tests])
 
+    @classmethod
+    def from_file(cls, filename=None):
+        filename = filename or cls.DEFAULT_FILENAME
 
-class ConfigParser(object):
-    """Configuration
-
-    `.codemonrc` is checked within the current directory of where
-    InfluenceMapper is run to get configurations.
-    """
-
-    DEFAULT_FILENAME = '.codemonrc'
-
-    def __init__(self, filename=None):
-        self.filename = filename or self.DEFAULT_FILENAME
-        self._config = None
-        self._read_config()
-
-    def _read_config(self):
         try:
-            with open(self.filename, 'rb') as f:
+            with open(filename, 'rb') as f:
                 config = yaml.load(f.read())
-                self._config = Config(config=config)
+                return Config(**config)
         except (yaml.parser.ParserError, ValueError):
             raise Exception('Error parsing config!')
-
-    @property
-    def config(self):
-        return self._config

@@ -6,7 +6,7 @@ from coverage import Coverage
 import msgpack
 
 from .watcher import Watcher
-from .config import Config, ConfigParser
+from .config import Config
 from .datastructures import SourceMap
 
 
@@ -205,7 +205,7 @@ class Codemon(object):
                  verbosity=1):
         assert issubclass(mapper_class, InfluenceMapper)
 
-        self.config = config or ConfigParser().config
+        self.config = config or Config.from_file()
         self.mapper = mapper_class(config=self.config,
                                    verbosity=verbosity)
         self.map_only = map_only
