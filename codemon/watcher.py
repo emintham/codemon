@@ -27,9 +27,6 @@ class BackgroundThread(threading.Thread):
     def run(self):
         self.running = True
 
-        if self.verbosity >= 2:
-            sys.stdout.write('Watcher started...')
-
         while self.running:
             time.sleep(self.frequency)
 
@@ -54,22 +51,25 @@ class Watcher(object):
         self.callback = callback
         self.mtimes = {}
         self.verbosity = verbosity
-        self.thread = self.get_thread()
+        self.thread = self._create_thread()
 
-    def get_thread(self):
+    def _create_thread(self):
         return BackgroundThread(self.test_if_changed,
                                 verbosity=self.verbosity,
                                 name='Watcher thread')
 
     def start(self):
-        try:
-            self.thread.start()
+        self.thread.start()
 
+        if self.verbosity >= 2:
+            sys.stdout.write('\n[CODEMON] Watcher is now watching your code...\n')
+
+        try:
             while True:
                 time.sleep(2)
 
                 if not self.thread.is_alive():
-                    self.thread = self.get_thread()
+                    self.thread = self._create_thread()
                     self.thread.start()
 
         except KeyboardInterrupt:
