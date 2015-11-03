@@ -52,14 +52,14 @@ class Test_SourceTestMap(TestCase):
                          self.expected_serialized_data)
 
     def test_deserialize(self):
-        actual = _SourceTestMap.deserialize(self.expected_serialized_data,
-                                            self.reverse_lookup)
+        actual = _SourceTestMap.deserialize((self.expected_serialized_data,
+                                             self.reverse_lookup))
         self.assertEqual(actual, self.obj)
 
     def test_serialize_deserialize_are_inverses(self):
         serialized = _SourceTestMap.serialize(self.obj, self.lookup)
-        actual = _SourceTestMap.deserialize(serialized,
-                                            self.reverse_lookup)
+        actual = _SourceTestMap.deserialize((serialized,
+                                             self.reverse_lookup))
 
         self.assertEqual(actual, self.obj)
 
@@ -144,12 +144,18 @@ class TestSourceMap(TestCase):
         self.assertEqual(serialized_data[1], self.obj.reverse_index)
 
     def test_deserialize(self):
-        actual = SourceMap.deserialize(self.expected_serialized_data,
-                                       self.obj.reverse_index)
+        actual = SourceMap.deserialize((self.expected_serialized_data,
+                                        self.obj.reverse_index))
         self.assertEqual(actual, self.obj)
 
     def test_serialize_deserialize_are_inverses(self):
         serialized = SourceMap.serialize(self.obj)
-        actual = SourceMap.deserialize(*serialized)
+        actual = SourceMap.deserialize(serialized)
 
         self.assertEqual(actual, self.obj)
+
+    def test_file_operations_save_state(self):
+        SourceMap.write_to_file(self.obj)
+        retrieved_obj = SourceMap.read_from_file()
+
+        self.assertEqual(self.obj, retrieved_obj)

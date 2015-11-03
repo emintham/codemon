@@ -1,5 +1,9 @@
 from collections import defaultdict, OrderedDict
 
+import sys
+
+import msgpack
+
 
 __all__ = ['SourceMap']
 
@@ -31,12 +35,9 @@ class _SourceTestMap(defaultdict):
             return []
 
     @classmethod
-    def deserialize(cls, serialized_data, reverse_lookup):
-        assert isinstance(serialized_data, tuple)
-        assert len(serialized_data) == 2
-        assert isinstance(serialized_data[1], dict)
+    def deserialize(cls, serialized_data):
+        ((filename, d), reverse_lookup) = serialized_data
 
-        filename, d = serialized_data
         new_obj = cls(filename=filename)
 
         for line_num, test_names in d.items():
@@ -70,6 +71,8 @@ class SourceMap(OrderedDict):
 
     An OrderedDict of SourceTestMaps with a convenient interface.
     """
+
+    DEFAULT_FILENAME = '.codemonmap'
 
     def __setitem__(self, filename, coverage_data):
         if not isinstance(coverage_data, tuple):
@@ -115,15 +118,16 @@ class SourceMap(OrderedDict):
         return dict(enumerate(self.suite()))
 
     @classmethod
-    def deserialize(cls, data, reverse_index):
+    def deserialize(cls, serialized_data):
+        data, reverse_index = serialized_data
+
         new_obj = cls()
 
         for serialized_stm in data:
             filename, _ = serialized_stm
 
             new_obj[filename] = _SourceTestMap.deserialize(
-                serialized_stm,
-                reverse_index
+                (serialized_stm, reverse_index)
             )
 
         return new_obj
@@ -145,3 +149,26 @@ class SourceMap(OrderedDict):
     def touch(self, filename):
         if filename not in self:
             self[filename] = _SourceTestMap(filename)
+
+    @classmethod
+    def write_to_file(cls, instance, filename=None):
+        filename = filename or cls.DEFAULT_FILENAME
+
+        output = '[CODEMON] Saving influence map to file {}\n\n'
+        sys.stdout.write(output.format(filename))
+
+        with open(filename, 'wb') as f:
+            f.write(msgpack.packb(cls.serialize(instance),
+                                  use_bin_type=True))
+
+    @classmethod
+    def read_from_file(cls, filename=None):
+        filename = filename or cls.DEFAULT_FILENAME
+
+        try:
+            with open(filename, 'rb') as f:
+                source_map = msgpack.unpackb(f.read())
+
+            return cls.deserialize(source_map)
+        except (IOError, EOFError):
+            return cls()
