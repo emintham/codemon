@@ -127,14 +127,14 @@ class TestSourceMap(TestCase):
         self.assertEqual(self.obj.files, self.filenames)
 
     def test_suite(self):
-        self.assertEqual(self.obj.suite(), [self.tests[2]])
+        self.assertEqual(self.obj.suite(), {self.tests[2]})
 
         self.obj[self.filenames[0]] = (self.tests[0], [1, 2])
         self.obj[self.filenames[0]] = (self.tests[1], [3, 4])
 
-        self.assertEqual(self.obj.suite(), self.tests)
-        self.assertEqual(self.obj.suite([self.filenames[0]]), self.tests[:-1])
-        self.assertEqual(self.obj.suite([self.filenames[1]]), self.tests[-1:])
+        self.assertEqual(self.obj.suite(), set(self.tests))
+        self.assertEqual(self.obj.suite([self.filenames[0]]), set(self.tests[:-1]))
+        self.assertEqual(self.obj.suite([self.filenames[1]]), set(self.tests[-1:]))
 
     def test_serialize(self):
         serialized_data = SourceMap.serialize(self.obj)

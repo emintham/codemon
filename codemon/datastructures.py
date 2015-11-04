@@ -2,6 +2,8 @@ from collections import defaultdict, OrderedDict
 
 import sys
 
+from msgpack.exceptions import UnpackValueError
+
 import msgpack
 
 
@@ -98,13 +100,13 @@ class SourceMap(OrderedDict):
 
     def suite(self, filenames=None):
         """
-        Returns a list of all related tests for a given list of source files.
+        Returns a set of all related tests for a given list of source files.
         """
         filenames = filenames or self.files
 
-        return [test
+        return {test
                 for filename in filenames
-                for test in self[filename].all_affected_tests]
+                for test in self[filename].all_affected_tests}
 
     @property
     def index(self):
@@ -170,5 +172,5 @@ class SourceMap(OrderedDict):
                 source_map = msgpack.unpackb(f.read())
 
             return cls.deserialize(source_map)
-        except (IOError, EOFError):
+        except (IOError, EOFError, UnpackValueError):
             return cls()
