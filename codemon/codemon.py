@@ -3,8 +3,6 @@ import sys
 
 from coverage import Coverage
 
-import msgpack
-
 from .watcher import Watcher
 from .config import Config
 from .datastructures import SourceMap
@@ -32,24 +30,14 @@ class InfluenceMapper(object):
     required setup and/or cleanups before/after `run` respectively.
     """
 
-    def __init__(self, config=None, source_map_file='.codemonmap',
-                 use_cached=False, verbosity=1):
+    def __init__(self, config=None, use_cached=False, verbosity=1):
         assert isinstance(config, Config)
 
         self.config = config
+        self.source_map = SourceMap.read_from_file()
         self._tests = None
-        self.source_map = self.read_from_file(source_map_file)
         self.use_cached = use_cached
         self.verbosity = verbosity
-
-    def read_from_file(self, filename):
-        try:
-            with open(filename, 'rb') as f:
-                source_map = msgpack.unpackb(f.read())
-
-            return SourceMap(source_map)
-        except (IOError, EOFError):
-            return SourceMap()
 
     def setup(self):
         """Hook to perform any optional setup before running."""
@@ -101,7 +89,9 @@ class InfluenceMapper(object):
     @property
     def tests(self):
         tests = self._tests or self.index_tests()
-        return self.filter_omitted_tests(tests)
+        self._tests = self.filter_omitted_tests(tests)
+
+        return self._tests
 
     def map_test(self, test_name):
         """Hook to run a single test to compute its influence"""
@@ -163,23 +153,16 @@ class InfluenceMapper(object):
 
             test_index += 1
 
-    def write_to_file(self, filename='.codemonmap'):
-        if self.verbosity >= 2:
-            sys.stdout.write('[CODEMON] Saving influence map to file {}\n\n'.format(filename))
-
-        with open(filename, 'wb') as f:
-            f.write(msgpack.packb(self.source_map.serialize(), use_bin_type=True))
-
     def run(self):
-        if self.use_cached:
-            return self.files
-
         self.setup()
 
         if self.verbosity >= 2:
             sys.stdout.write('[CODEMON] Indexing tests...\n\n')
 
         tests = self.tests
+
+        if self.use_cached:
+            return self.files
 
         if len(tests) == 0:
             error_message = ('No tests to run! Either `map_test` not '
@@ -189,7 +172,7 @@ class InfluenceMapper(object):
         else:
             self.match_tests_to_source(tests)
             self.cleanup()
-            self.write_to_file()
+            SourceMap.write_to_file(self.source_map)
 
         return self.files
 
@@ -202,11 +185,12 @@ class Codemon(object):
     """
 
     def __init__(self, config=None, mapper_class=None, map_only=False,
-                 verbosity=1):
+                 use_cached=False, verbosity=1):
         assert issubclass(mapper_class, InfluenceMapper)
 
         self.config = config or Config.from_file()
         self.mapper = mapper_class(config=self.config,
+                                   use_cached=use_cached,
                                    verbosity=verbosity)
         self.map_only = map_only
         self.verbosity = verbosity
@@ -221,4 +205,5 @@ class Codemon(object):
         self.watcher = Watcher(self.mapper.files,
                                verbosity=self.verbosity,
                                callback=self.mapper.run_affected_tests)
+
         self.watcher.start()
