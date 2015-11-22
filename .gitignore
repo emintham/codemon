@@ -1,6 +1,10 @@
+# python stuff
 *.pyc
 __pycache__
+
+# coverage
 .codemonmap
+.coverage
 
 # setup.py stuff
 dist/
