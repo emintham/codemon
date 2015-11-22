@@ -1,3 +1,8 @@
 *.pyc
 __pycache__
 .codemonmap
+
+# setup.py stuff
+dist/
+/*.egg-info
+build/

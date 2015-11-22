@@ -1,3 +1,0 @@
-msgpack-python
-coverage
-pyyaml
